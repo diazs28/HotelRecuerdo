@@ -2,7 +2,7 @@ import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { ZodError } from 'zod';
 import { Prisma } from '../generated/prisma/client.js';
 import { AppError } from '../utils/AppError.js';
-import { esViolacionExclusion } from '../utils/erroresBd.js';
+import { esConflictoTransitorio, esViolacionExclusion } from '../utils/erroresBd.js';
 import { logger } from '../lib/logger.js';
 
 export const notFoundHandler: RequestHandler = (_req, res) => {
@@ -39,6 +39,17 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
       error: {
         code: 'CAMA_NO_DISPONIBLE',
         message: 'Una o más camas ya están ocupadas o bloqueadas en esas fechas',
+      },
+    });
+    return;
+  }
+
+  // Dos operaciones simultáneas se bloquearon entre sí: PostgreSQL revirtió una de ellas
+  if (esConflictoTransitorio(err)) {
+    res.status(409).json({
+      error: {
+        code: 'CONFLICTO_CONCURRENTE',
+        message: 'Otra persona hizo un cambio al mismo tiempo; intenta de nuevo',
       },
     });
     return;

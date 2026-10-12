@@ -18,8 +18,8 @@ import type { CambiarEstadoInput } from '../schemas/reservas.schema.js';
 import { registrarAuditoria } from './auditoria.service.js';
 import {
   bloquearReserva,
+  cortarOcupacionesDesde,
   liberarOcupacionesReserva,
-  moverOcupacionesReserva,
 } from './ocupaciones.service.js';
 import {
   leerReserva,
@@ -63,12 +63,17 @@ async function aplicarCondiciones(
       return { data: {}, auditoria: {} };
     }
     case 'FINALIZADA': {
-      // Salida anticipada: se liberan las noches que no se usarán (la salida pasa a ser hoy)
-      if (hoy > entrada && hoy < salida) {
-        await moverOcupacionesReserva(tx, r.id, entrada, hoy);
+      // Salida anticipada: se liberan las noches que no se usarán, desde hoy. Si el huésped se va el
+      // mismo día de la entrada, no usó ninguna noche y las camas quedan libres completas.
+      if (hoy < salida) {
+        const liberadas = await cortarOcupacionesDesde(
+          tx,
+          { reservaId: r.id, fechaFin: aFechaBd(salida) },
+          hoy,
+        );
         return {
-          data: { fechaSalida: aFechaBd(hoy) },
-          auditoria: { salidaAnticipada: hoy, salidaOriginal: salida },
+          data: hoy > entrada ? { fechaSalida: aFechaBd(hoy) } : {},
+          auditoria: { salidaAnticipada: hoy, salidaOriginal: salida, camasLiberadas: liberadas },
         };
       }
       return { data: {}, auditoria: {} };
@@ -107,7 +112,7 @@ export async function cambiarEstado(
         409,
         `No se puede pasar de "${ETIQUETAS_ESTADO[r.estado]}" a "${ETIQUETAS_ESTADO[destino]}"`,
         'TRANSICION_INVALIDA',
-        { desde: r.estado, hacia: destino },
+        [{ path: 'estado', message: 'Transición no permitida', desde: r.estado, hacia: destino }],
       );
     }
 

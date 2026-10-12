@@ -1,6 +1,7 @@
 // Configuración del hotel: ajustes publicables, tipos de habitación y canales.
 
-import { Prisma } from '../generated/prisma/client.js';
+import type { Prisma } from '../generated/prisma/client.js';
+import { esUnicoRepetido } from '../utils/erroresBd.js';
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../utils/AppError.js';
 import {
@@ -110,10 +111,6 @@ const nombreRepetido = (que: string) =>
     { path: 'nombre', message: 'Usa otro nombre' },
   ]);
 
-function esP2002(err: unknown): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
-}
-
 export function listarTiposHabitacion() {
   return prisma.tipoHabitacion.findMany({
     orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
@@ -144,7 +141,7 @@ export async function crearTipoHabitacion(datos: TipoHabitacionInput, usuarioId:
       return t;
     });
   } catch (err) {
-    if (esP2002(err)) throw nombreRepetido('un tipo de habitación');
+    if (esUnicoRepetido(err)) throw nombreRepetido('un tipo de habitación');
     throw err;
   }
 }
@@ -167,7 +164,7 @@ export async function actualizarTipoHabitacion(
       return t;
     });
   } catch (err) {
-    if (esP2002(err)) throw nombreRepetido('un tipo de habitación');
+    if (esUnicoRepetido(err)) throw nombreRepetido('un tipo de habitación');
     throw err;
   }
 }
@@ -195,7 +192,7 @@ export async function crearCanal(datos: CanalInput, usuarioId: string) {
       return c;
     });
   } catch (err) {
-    if (esP2002(err)) throw nombreRepetido('un canal');
+    if (esUnicoRepetido(err)) throw nombreRepetido('un canal');
     throw err;
   }
 }

@@ -29,3 +29,16 @@ export function esViolacionExclusion(err: unknown): boolean {
   const texto = textoDelError(err);
   return texto.includes(RESTRICCION_OCUPACIONES) || texto.includes(EXCLUSION);
 }
+
+// Deadlock (40P01) o fallo de serialización (40001): la operación se puede reintentar
+export function esConflictoTransitorio(err: unknown): boolean {
+  const texto = textoDelError(err);
+  return ['40P01', '40001', 'deadlock detected'].some((c) => texto.includes(c));
+}
+
+// Violación de un índice único (P2002). Si se indica, solo cuando involucra ese campo o índice.
+export function esUnicoRepetido(err: unknown, indice?: string): boolean {
+  if (!err || typeof err !== 'object' || (err as { code?: unknown }).code !== 'P2002') return false;
+  if (!indice) return true;
+  return JSON.stringify((err as { meta?: unknown }).meta ?? {}).includes(indice);
+}

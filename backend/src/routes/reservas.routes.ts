@@ -16,12 +16,8 @@ import {
   type ListarReservasQuery,
 } from '../schemas/reservas.schema.js';
 import { claveIdempotenciaSchema } from '../schemas/publico.schema.js';
-import {
-  actualizarReserva,
-  crearReserva,
-  listarReservas,
-  obtenerReserva,
-} from '../services/reservas.service.js';
+import { crearReserva, listarReservas, obtenerReserva } from '../services/reservas.service.js';
+import { actualizarReserva } from '../services/reservas.edicion.service.js';
 import { cambiarEstado } from '../services/reservasEstado.service.js';
 import { asignarCamas, quitarCama } from '../services/asignaciones.service.js';
 import { AppError } from '../utils/AppError.js';

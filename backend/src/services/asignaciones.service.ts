@@ -2,18 +2,25 @@
 
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../utils/AppError.js';
-import { deFechaBd } from '../domain/fechas.js';
+import { deFechaBd, hoyEnHotel } from '../domain/fechas.js';
 import { ESTADOS_ASIGNABLES, capacidadSuficiente } from '../domain/estadosReserva.js';
 import type { PermisosDatos } from '../domain/privacidad.js';
 import type { AsignarCamasInput } from '../schemas/reservas.schema.js';
 import { registrarAuditoria } from './auditoria.service.js';
 import {
+  bloquearCamas,
   bloquearReserva,
   conControlDeCruces,
+  cortarOcupacionesDesde,
   crearOcupacionesReserva,
   liberarOcupacionesReserva,
 } from './ocupaciones.service.js';
-import { leerReserva, plazasAsignadas, presentarReserva } from './reservas.presentacion.js';
+import {
+  leerReserva,
+  ocupacionesVigentes,
+  plazasAsignadas,
+  presentarReserva,
+} from './reservas.presentacion.js';
 
 // Camas activas de habitaciones activas: las indicadas y todas las de las habitaciones indicadas
 export async function resolverCamasAsignables(
@@ -62,7 +69,7 @@ export async function asignarCamas(
 ) {
   const actual = await leerReserva(prisma, reservaId);
   const camas = await resolverCamasAsignables(datos.camaIds, datos.habitacionIds);
-  const yaAsignadas = new Set(actual.ocupaciones.map((o) => o.cama.id));
+  const yaAsignadas = new Set(ocupacionesVigentes(actual).map((o) => o.cama.id));
   const nuevas = camas.map((c) => c.id).filter((id) => !yaAsignadas.has(id));
   const entrada = deFechaBd(actual.fechaEntrada);
   const salida = deFechaBd(actual.fechaSalida);
@@ -74,17 +81,21 @@ export async function asignarCamas(
         const r = await leerReserva(tx, reservaId);
         if (!ESTADOS_ASIGNABLES.includes(r.estado)) throw estadoNoAsignable();
         // Las fechas pudieron cambiar entre la lectura y el bloqueo: se usan las vigentes
-        const asignadas = new Set(r.ocupaciones.map((o) => o.cama.id));
+        const asignadas = new Set(ocupacionesVigentes(r).map((o) => o.cama.id));
         const porCrear = nuevas.filter((id) => !asignadas.has(id));
         if (porCrear.length === 0) return;
 
-        await crearOcupacionesReserva(
-          tx,
-          reservaId,
-          porCrear,
-          deFechaBd(r.fechaEntrada),
-          deFechaBd(r.fechaSalida),
-        );
+        // La cama no puede retirarse mientras se asigna (bloqueo compartido de sus filas)
+        const activas = await bloquearCamas(tx, porCrear, 'compartido');
+        if (porCrear.some((id) => !activas.has(id))) {
+          throw new AppError(409, 'Alguna cama fue retirada mientras se asignaba', 'CAMA_INVALIDA');
+        }
+
+        // En una estancia en curso, la cama nueva se ocupa desde hoy (las noches pasadas no cambian)
+        const entradaReal = deFechaBd(r.fechaEntrada);
+        const hoy = hoyEnHotel();
+        const desde = r.estado === 'EN_ALOJAMIENTO' && hoy > entradaReal ? hoy : entradaReal;
+        await crearOcupacionesReserva(tx, reservaId, porCrear, desde, deFechaBd(r.fechaSalida));
         await registrarAuditoria(tx, {
           usuarioId,
           accion: 'reserva.camas_asignadas',
@@ -92,7 +103,7 @@ export async function asignarCamas(
           entidadId: reservaId,
           datos: {
             camaIds: porCrear,
-            fechaEntrada: deFechaBd(r.fechaEntrada),
+            desde,
             fechaSalida: deFechaBd(r.fechaSalida),
           },
         });
@@ -114,7 +125,7 @@ export async function quitarCama(
     const r = await leerReserva(tx, reservaId);
     if (!ESTADOS_ASIGNABLES.includes(r.estado)) throw estadoNoAsignable();
 
-    const ocupacion = r.ocupaciones.find((o) => o.cama.id === camaId);
+    const ocupacion = ocupacionesVigentes(r).find((o) => o.cama.id === camaId);
     if (!ocupacion) throw new AppError(404, 'La cama no está asignada a esta reserva', 'NOT_FOUND');
 
     // Una reserva confirmada o en alojamiento debe conservar camas suficientes
@@ -130,7 +141,12 @@ export async function quitarCama(
       );
     }
 
-    await liberarOcupacionesReserva(tx, reservaId, [camaId]);
+    // En una estancia en curso las noches ya usadas quedan en el historial; si no, se libera todo
+    if (r.estado === 'EN_ALOJAMIENTO') {
+      await cortarOcupacionesDesde(tx, { id: ocupacion.id }, hoyEnHotel());
+    } else {
+      await liberarOcupacionesReserva(tx, reservaId, [camaId]);
+    }
     await registrarAuditoria(tx, {
       usuarioId,
       accion: 'reserva.cama_liberada',

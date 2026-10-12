@@ -6,7 +6,8 @@ import { env, trustProxy } from './config/env.js';
 import { logger } from './lib/logger.js';
 import { apiRouter } from './routes/index.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
-import { limitador } from './middlewares/rateLimit.js';
+import { rateLimit } from 'express-rate-limit';
+import { claveIp } from './middlewares/rateLimit.js';
 
 export function createApp() {
   const app = express();
@@ -41,20 +42,20 @@ export function createApp() {
       allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
     }),
   );
+  // Límite global por IP en memoria (barato en cada petición). Los límites sensibles (login y
+  // formulario público) usan PostgreSQL: persisten y se comparten entre instancias.
   app.use(
-    limitador(
-      'global',
-      {
-        windowMs: env.RATE_LIMIT_WINDOW_MS,
-        limit: env.RATE_LIMIT_MAX,
-        skip: (req) => req.path.startsWith('/api/health'),
-        message: {
-          error: { code: 'RATE_LIMITED', message: 'Demasiadas solicitudes, intenta más tarde' },
-        },
+    rateLimit({
+      windowMs: env.RATE_LIMIT_WINDOW_MS,
+      limit: env.RATE_LIMIT_MAX,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      keyGenerator: claveIp,
+      skip: (req) => req.path.startsWith('/api/health'),
+      message: {
+        error: { code: 'RATE_LIMITED', message: 'Demasiadas solicitudes, intenta más tarde' },
       },
-      // Si la BD no responde, el límite global deja pasar: /api/health debe seguir respondiendo
-      true,
-    ),
+    }),
   );
   app.use(express.json({ limit: '100kb' }));
 

@@ -9,6 +9,10 @@ import { esViolacionExclusion } from '../utils/erroresBd.js';
 import { aFechaBd, deFechaBd } from '../domain/fechas.js';
 import { codigoReserva } from '../domain/estadosReserva.js';
 
+// Las camas se insertan siempre ordenadas por id: dos transacciones que compiten por varias camas
+// las toman en el mismo orden y no se bloquean mutuamente (deadlock).
+const ordenadas = (ids: readonly string[]) => [...new Set(ids)].sort();
+
 export async function crearOcupacionesReserva(
   tx: Tx,
   reservaId: string,
@@ -18,7 +22,7 @@ export async function crearOcupacionesReserva(
 ): Promise<void> {
   if (camaIds.length === 0) return;
   await tx.ocupacion.createMany({
-    data: camaIds.map((camaId) => ({
+    data: ordenadas(camaIds).map((camaId) => ({
       camaId,
       tipo: 'RESERVA' as const,
       reservaId,
@@ -28,8 +32,8 @@ export async function crearOcupacionesReserva(
   });
 }
 
-// Cambia las noches de todas las ocupaciones activas de la reserva (cambio de fechas o salida
-// anticipada). Si alguna cama ya está tomada en las nuevas noches, la base de datos lo rechaza.
+// Cambio de fechas de una reserva que aún no empieza: todas sus camas toman las nuevas noches.
+// Si alguna cama ya está tomada en esas noches, la base de datos lo rechaza.
 export async function moverOcupacionesReserva(
   tx: Tx,
   reservaId: string,
@@ -39,6 +43,20 @@ export async function moverOcupacionesReserva(
   await tx.ocupacion.updateMany({
     where: { reservaId, activa: true },
     data: { fechaInicio: aFechaBd(entrada), fechaFin: aFechaBd(salida) },
+  });
+}
+
+// Cambio de la salida de una estancia en curso: solo se mueven las camas vigentes (las que llegan
+// hasta la salida actual); las que se quitaron a mitad de la estancia conservan su recorte.
+export async function moverSalidaOcupaciones(
+  tx: Tx,
+  reservaId: string,
+  salidaActual: string,
+  salidaNueva: string,
+): Promise<void> {
+  await tx.ocupacion.updateMany({
+    where: { reservaId, activa: true, fechaFin: aFechaBd(salidaActual) },
+    data: { fechaFin: aFechaBd(salidaNueva) },
   });
 }
 
@@ -54,6 +72,29 @@ export async function liberarOcupacionesReserva(
   return r.count;
 }
 
+// Termina ocupaciones "desde hoy": las noches pasadas quedan en el historial (fin = hoy) y las que
+// aún no empiezan se desactivan. Nunca deja un rango vacío (fin = inicio).
+export async function cortarOcupacionesDesde(
+  tx: Tx,
+  where: Prisma.OcupacionWhereInput,
+  hoy: string,
+): Promise<number> {
+  const base = { ...where, activa: true };
+  const recortadas = await tx.ocupacion.updateMany({
+    where: {
+      ...base,
+      fechaInicio: { lt: aFechaBd(hoy) },
+      OR: [{ fechaFin: null }, { fechaFin: { gt: aFechaBd(hoy) } }],
+    },
+    data: { fechaFin: aFechaBd(hoy) },
+  });
+  const anuladas = await tx.ocupacion.updateMany({
+    where: { ...base, fechaInicio: { gte: aFechaBd(hoy) } },
+    data: { activa: false, liberadaEn: new Date() },
+  });
+  return recortadas.count + anuladas.count;
+}
+
 export async function crearOcupacionesBloqueo(
   tx: Tx,
   bloqueoId: string,
@@ -63,7 +104,7 @@ export async function crearOcupacionesBloqueo(
 ): Promise<void> {
   if (camaIds.length === 0) return;
   await tx.ocupacion.createMany({
-    data: camaIds.map((camaId) => ({
+    data: ordenadas(camaIds).map((camaId) => ({
       camaId,
       tipo: 'BLOQUEO' as const,
       bloqueoId,
@@ -71,6 +112,29 @@ export async function crearOcupacionesBloqueo(
       fechaFin: fin === null ? null : aFechaBd(fin),
     })),
   });
+}
+
+// Bloquea las camas (ordenadas por id) durante la transacción y devuelve las que siguen activas
+// en habitaciones activas. "compartido" al asignar; "exclusivo" al retirar camas o habitaciones:
+// así una cama no se retira mientras otra persona la asigna.
+export async function bloquearCamas(
+  tx: Tx,
+  camaIds: readonly string[],
+  modo: 'compartido' | 'exclusivo',
+): Promise<Set<string>> {
+  if (camaIds.length === 0) return new Set();
+  const ids = ordenadas(camaIds);
+  const filas =
+    modo === 'exclusivo'
+      ? await tx.$queryRaw<Array<{ id: string; activa: boolean }>>(Prisma.sql`
+          SELECT c.id, (c.activa AND h.activa) AS activa FROM camas c
+          JOIN habitaciones h ON h.id = c.habitacion_id
+          WHERE c.id = ANY(${ids}::uuid[]) ORDER BY c.id FOR UPDATE OF c`)
+      : await tx.$queryRaw<Array<{ id: string; activa: boolean }>>(Prisma.sql`
+          SELECT c.id, (c.activa AND h.activa) AS activa FROM camas c
+          JOIN habitaciones h ON h.id = c.habitacion_id
+          WHERE c.id = ANY(${ids}::uuid[]) ORDER BY c.id FOR SHARE OF c`);
+  return new Set(filas.filter((f) => f.activa).map((f) => f.id));
 }
 
 export interface ConflictoCama {
