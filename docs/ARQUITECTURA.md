@@ -14,7 +14,7 @@ flowchart LR
 
 - **Un solo origen.** El navegador llama a `/api` en el mismo dominio, sin CORS entre dominios ni cookies. La sesión va en `Authorization: Bearer`.
 - **Monolito modular.** La API se organiza por capas: `routes` (validar, autorizar, llamar), `services` (reglas y transacciones), `domain` (funciones puras) y `schemas` (Zod).
-- **Migraciones aparte.** Un servicio de un solo uso aplica las migraciones y carga los datos base. La API no migra al arrancar.
+- **Migraciones aparte.** Un servicio de un solo uso aplica las migraciones con el rol dueño, crea o actualiza el rol de mínimo privilegio de la API (`backend/scripts/rol-aplicacion.ts`) y carga los datos base. La API no migra al arrancar y no puede cambiar tablas.
 
 ## Modelo de datos
 
@@ -50,6 +50,6 @@ Ver [API.md](API.md) y Swagger en `/api/docs`.
 
 ## Autenticación y roles
 
-- `POST /api/auth/login` entrega un JWT HS256 de corta duración (8 horas por defecto) con `ver` (versión de token).
+- `POST /api/auth/login` entrega un JWT HS256 de corta duración (2 horas por defecto, configurable) con `ver` (versión de token).
 - Cada petición del panel recarga el usuario y sus permisos: desactivar a alguien o cambiar su rol aplica de inmediato.
 - Permisos: `tablero:ver`, `reservas:ver|gestionar|cancelar`, `habitaciones:ver|gestionar`, `bloqueos:gestionar`, `huespedes:ver|ver_documento|gestionar_datos`, `configuracion:gestionar`, `usuarios:gestionar`, `auditoria:ver`.

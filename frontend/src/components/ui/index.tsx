@@ -96,7 +96,7 @@ function Envoltura({
 const estiloCampo = (error?: string) =>
   cx(
     'min-h-11 w-full rounded-md border bg-white px-3 py-2 text-base text-hierro placeholder:text-piedra/80',
-    'focus:border-porton focus:outline-none focus:ring-2 focus:ring-porton/30',
+    'focus:border-porton focus:outline-none focus:ring-2 focus:ring-porton',
     error ? 'border-ladrillo' : 'border-linea',
   );
 

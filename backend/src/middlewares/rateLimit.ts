@@ -52,6 +52,14 @@ export function crearLimitesLogin() {
       keyGenerator: (req) => `${claveIp(req)}|${emailDelCuerpo(req)}`,
       skipSuccessfulRequests: true,
     }),
+    // Tope por cuenta desde cualquier IP (frena ataques distribuidos contra una sola cuenta).
+    // Más alto que el de IP + cuenta para que un tercero no pueda bloquear fácilmente al personal.
+    limitador('login-cuenta', {
+      windowMs: 60 * 60 * 1000,
+      limit: env.AUTH_RATE_LIMIT_MAX * 4,
+      keyGenerator: (req) => `cuenta|${emailDelCuerpo(req)}`,
+      skipSuccessfulRequests: true,
+    }),
   ];
 }
 

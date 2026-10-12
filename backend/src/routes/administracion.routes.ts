@@ -131,10 +131,11 @@ huespedesRouter.post(
 export const configuracionRouter = Router();
 
 // Lectura de catálogos: cualquier persona del personal (formularios de reservas y habitaciones)
-configuracionRouter.get('/tipos-habitacion', async (_req, res) => {
+const verCatalogos = requirePermiso('reservas:ver', 'habitaciones:ver', 'configuracion:gestionar');
+configuracionRouter.get('/tipos-habitacion', verCatalogos, async (_req, res) => {
   res.json(await listarTiposHabitacion());
 });
-configuracionRouter.get('/canales', async (_req, res) => {
+configuracionRouter.get('/canales', verCatalogos, async (_req, res) => {
   res.json(await listarCanales());
 });
 

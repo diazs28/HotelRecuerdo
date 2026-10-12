@@ -9,7 +9,9 @@
 # Producción: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d (ver README).
 name: hotel-el-recuerdo
 
-x-database-url: &database-url postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hotel_el_recuerdo}
+# Rol dueño de las tablas (solo para migraciones) y rol de la API con permisos mínimos
+x-url-dueno: &url-dueno postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hotel_el_recuerdo}
+x-url-app: &url-app postgresql://${APP_DB_USER:-hotel_app}:${APP_DB_PASSWORD:?Define APP_DB_PASSWORD en .env}@db:5432/${POSTGRES_DB:-hotel_el_recuerdo}
 
 services:
   db:
@@ -38,7 +40,9 @@ services:
       target: migraciones
     environment:
       NODE_ENV: production
-      DATABASE_URL: *database-url
+      # Migra con el rol dueño; crea el rol de la API y carga los datos base con ese rol
+      MIGRATION_DATABASE_URL: *url-dueno
+      DATABASE_URL: *url-app
       # El seed carga la misma configuración validada que la API
       JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en .env}
       TRUST_PROXY: ${TRUST_PROXY:-1}
@@ -55,9 +59,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: *database-url
+      # Rol sin permisos para cambiar tablas ni tocar la auditoría (scripts/rol-aplicacion.ts)
+      DATABASE_URL: *url-app
       JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en .env}
-      JWT_TTL_MIN: ${JWT_TTL_MIN:-480}
+      JWT_TTL_MIN: ${JWT_TTL_MIN:-120}
       TRUST_PROXY: ${TRUST_PROXY:-1}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -71,6 +76,9 @@ services:
   web:
     build:
       context: ./frontend
+      args:
+        # URL pública del sitio (enlace canónico e imagen para redes sociales)
+        SITIO_URL: ${SITIO_URL:-http://localhost:8080}
     restart: unless-stopped
     depends_on:
       api:

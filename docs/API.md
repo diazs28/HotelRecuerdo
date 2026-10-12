@@ -43,7 +43,7 @@ Fechas de calendario: `AAAA-MM-DD` (zona `America/Bogota`). La especificación O
 | GET | `/admin/huespedes/:id/exportar` | `huespedes:gestionar_datos` |
 | POST | `/admin/huespedes/:id/anonimizar` | `huespedes:gestionar_datos` |
 | GET, PUT | `/admin/configuracion/ajustes[/:clave]` | `configuracion:gestionar` |
-| GET, POST, PATCH | `/admin/configuracion/tipos-habitacion`, `/canales` | lectura: sesión; escritura: `configuracion:gestionar` |
+| GET, POST, PATCH | `/admin/configuracion/tipos-habitacion`, `/canales` | lectura: `reservas:ver`, `habitaciones:ver` o `configuracion:gestionar`; escritura: `configuracion:gestionar` |
 | GET, POST, PATCH | `/admin/usuarios` | `usuarios:gestionar` |
 | GET | `/admin/usuarios/personal` | `reservas:ver` |
 | GET, PUT | `/admin/roles`, `/admin/roles/:id/permisos` | `usuarios:gestionar` |

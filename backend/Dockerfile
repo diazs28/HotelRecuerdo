@@ -57,6 +57,7 @@ COPY src ./src
 COPY scripts ./scripts
 RUN DATABASE_URL=postgresql://build:build@localhost:5432/build npx prisma generate
 USER node
-# Aplica las migraciones pendientes y carga los datos base (idempotente: permisos, roles, canales).
+# Aplica las migraciones pendientes (rol dueño), crea o actualiza el rol de mínimo privilegio de la
+# API y carga los datos base (idempotente: permisos, roles, canales).
 #   docker compose run --rm migraciones npm run crear-admin     (primer administrador)
-CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx prisma/seed.ts"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx scripts/rol-aplicacion.ts && npx tsx prisma/seed.ts"]

@@ -437,7 +437,7 @@ const RUTAS: Ruta[] = [
     path: '/admin/configuracion/tipos-habitacion',
     tag: 'Configuración',
     resumen: 'Tipos de habitación',
-    permisos: [],
+    permisos: ['reservas:ver', 'habitaciones:ver', 'configuracion:gestionar'],
     ok: 200,
   },
   {
@@ -466,7 +466,7 @@ const RUTAS: Ruta[] = [
     path: '/admin/configuracion/canales',
     tag: 'Configuración',
     resumen: 'Canales de origen de las reservas',
-    permisos: [],
+    permisos: ['reservas:ver', 'habitaciones:ver', 'configuracion:gestionar'],
     ok: 200,
   },
   {
