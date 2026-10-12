@@ -23,7 +23,12 @@ function marcarVista() {
   }
 }
 
-const debeMostrarse = () => !movimientoReducido() && window.location.pathname === '/' && !yaVista();
+const debeMostrarse = () =>
+  !movimientoReducido() &&
+  window.location.pathname === '/' &&
+  // Con un enlace a una sección (/#habitaciones) se va directo a ella, sin entrada
+  !window.location.hash &&
+  !yaVista();
 
 // Pantalla de entrada (adaptada de la de Portal Salud): el contador viaja de 1979 al año actual,
 // "El Recuerdo" emerge letra por letra y una arcada de arcos blancos sube para descubrir el sitio.

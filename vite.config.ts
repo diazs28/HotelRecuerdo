@@ -20,5 +20,5 @@ export default defineConfig({
   ],
   define: { 'import.meta.env.VITE_MODO_DEMO': JSON.stringify('true') },
   server: { port: 5180 },
-  build: { sourcemap: false, chunkSizeWarningLimit: 700 },
+  build: { sourcemap: false, assetsInlineLimit: 0, chunkSizeWarningLimit: 700 },
 });
