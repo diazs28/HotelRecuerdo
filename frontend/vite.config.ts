@@ -2,8 +2,18 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
+// URL pública del sitio (enlace canónico y og:image necesitan una URL absoluta)
+const sitioUrl = (process.env.SITIO_URL ?? 'http://localhost:8080').replace(/\/$/, '');
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    {
+      name: 'url-del-sitio',
+      transformIndexHtml: (html) => html.replaceAll('%SITIO_URL%', sitioUrl),
+    },
+  ],
   server: {
     port: 5173,
     strictPort: true,

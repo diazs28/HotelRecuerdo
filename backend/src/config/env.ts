@@ -56,7 +56,7 @@ export const envSchema = z
     // Sesiones del personal (JWT HS256)
     JWT_SECRET: z.string().min(32, 'JWT_SECRET debe tener al menos 32 caracteres'),
     JWT_ISSUER: z.string().trim().min(1).default('hotel-el-recuerdo-api'),
-    JWT_TTL_MIN: z.coerce.number().int().min(5).max(720).default(480),
+    JWT_TTL_MIN: z.coerce.number().int().min(5).max(720).default(120),
 
     // Login: intentos FALLIDOS por IP + email en la ventana
     AUTH_RATE_LIMIT_WINDOW_MS: enteroPositivo(15 * 60 * 1000),

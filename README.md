@@ -47,7 +47,7 @@ La lista completa está en [docs/PENDIENTES-HOTEL.md](docs/PENDIENTES-HOTEL.md).
 ## Instalación y puesta en marcha con Docker
 
 ```bash
-# 1. Variables: copia el ejemplo y completa POSTGRES_PASSWORD y JWT_SECRET
+# 1. Variables: copia el ejemplo y completa POSTGRES_PASSWORD, APP_DB_PASSWORD y JWT_SECRET
 cp .env.example .env
 #    Genera cada secreto con:
 #    node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -81,13 +81,15 @@ Raíz (`.env`, usada por Docker Compose; plantilla en [`.env.example`](.env.exam
 
 | Variable | Para qué |
 |---|---|
-| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Credenciales de la base de datos (contraseña solo con letras y números) |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Rol dueño de la base: solo lo usan las migraciones (contraseña solo con letras y números) |
+| `APP_DB_USER`, `APP_DB_PASSWORD` | Rol con el que se conecta la API: solo lee y escribe datos, no puede cambiar tablas ni la auditoría. Lo crea el paso de migraciones (contraseña de 16 o más letras y números) |
 | `POSTGRES_PORT` | Puerto publicado **solo en 127.0.0.1** para desarrollar (por defecto 5436) |
 | `JWT_SECRET` | Secreto de las sesiones del personal (mínimo 32 caracteres) |
-| `JWT_TTL_MIN` | Duración de la sesión en minutos (por defecto 480, máximo 720) |
-| `TRUST_PROXY` | Proxies delante de la API (1: nginx) |
+| `JWT_TTL_MIN` | Duración de la sesión en minutos (por defecto 120, máximo 720) |
+| `TRUST_PROXY` | Proxies delante de la API (1: nginx; en producción, 2: Caddy y nginx) |
 | `CORS_ORIGINS` | Orígenes permitidos del navegador |
 | `WEB_PORT` | Puerto del sitio (por defecto 8080) |
+| `SITIO_URL` | URL pública para el enlace canónico y la imagen de redes (en producción, `https://$DOMINIO`) |
 | `DOMINIO` | Solo en producción: dominio para HTTPS con Caddy |
 
 Backend en desarrollo (`backend/.env`; plantilla en [`backend/.env.example`](backend/.env.example)): `DATABASE_URL`, `TEST_DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGINS`, `TRUST_PROXY`, límites de intentos y, opcionalmente, `SEED_ADMIN_*`.
@@ -171,19 +173,24 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm migraci
 | CORS | `http://localhost:8080` | `https://$DOMINIO` |
 | Reinicio | `unless-stopped` | `always` |
 | Datos de ejemplo | `npm run db:seed -- --demo` (opcional) | Nunca (el seed los omite en producción) |
+| Base de pruebas | Se crea al iniciar el volumen | No se crea |
+| IP real del visitante | `TRUST_PROXY=1` (nginx) | `TRUST_PROXY=2` (Caddy y nginx) |
 
-Recomendado antes de salir a producción: respaldo diario automático de la base, un rol de PostgreSQL con permisos mínimos para la API (`MIGRATION_DATABASE_URL` para migrar con el rol dueño) y monitoreo de `GET /api/health/db`.
+Recomendado antes de salir a producción: respaldo diario automático de la base (por ejemplo, `pg_dump` programado y copiado fuera del servidor) y monitoreo de `GET /api/health/db`.
 
 ## Seguridad
 
 - Sesión del personal con JWT HS256 en `sessionStorage` (nunca `localStorage`), invalidable al cerrar sesión, cambiar contraseña, desactivar a la persona o cambiar su rol.
-- Contraseñas con argon2id. El login responde igual y en el mismo tiempo si el correo no existe. Límite de intentos fallidos por IP y correo, guardado en PostgreSQL.
+- Contraseñas con argon2id. El login responde igual y en el mismo tiempo si el correo no existe. Límite de intentos fallidos por IP, por IP y correo, y por cuenta desde cualquier IP, guardado en PostgreSQL. Una cabecera `X-Forwarded-For` falsificada no cambia la IP que se cuenta.
+- La API se conecta con un rol de PostgreSQL de **mínimo privilegio** (sin DDL, sin acceso a la tabla de migraciones, sin poder editar la auditoría). El rol dueño solo lo usan las migraciones.
 - Autorización en **cada** ruta del panel por permisos `recurso:accion`, configurables por rol.
 - Validación estricta con Zod en el servidor: campos desconocidos se rechazan, incluido cualquier precio enviado desde el navegador.
 - Formulario público con límite por IP, campo trampa para robots, autorización de datos obligatoria e `Idempotency-Key` para no duplicar solicitudes.
 - Errores con formato único `{ error: { code, message, details? } }`, sin mensajes internos. Los logs no guardan cuerpos, búsquedas ni datos personales.
 - Datos personales según permisos (documento y contacto enmascarados). Exportación y supresión del titular según la Ley 1581 (ver [docs/PRIVACIDAD.md](docs/PRIVACIDAD.md)). **No se afirma cumplimiento legal certificado.**
 - Auditoría inmutable (un *trigger* impide editarla o borrarla).
-- Contenedores sin root, sin secretos en las imágenes, CSP y cabeceras de seguridad en nginx y helmet en la API.
+- Contenedores sin root, sin secretos en las imágenes, CSP y cabeceras de seguridad en nginx (también para `/assets`) y helmet en la API. El panel lleva `X-Robots-Tag: noindex` y `robots.txt` lo excluye.
+- Los errores inesperados se registran sin su mensaje (Prisma puede incluir datos de la consulta).
+- `npm audit` (0 vulnerabilidades) y gitleaks (sin secretos en el historial) en CI. La única excepción de gitleaks son las contraseñas ficticias de `backend/test/` (`.gitleaks.toml`).
 
 Documentación de la API: [docs/API.md](docs/API.md) y Swagger en `/api/docs` (fuera de producción).

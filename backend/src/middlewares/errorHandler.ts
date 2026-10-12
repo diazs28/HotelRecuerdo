@@ -87,7 +87,23 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     return;
   }
 
-  logger.error({ err }, 'Error no controlado');
+  // Solo tipo, código y pila sin el mensaje: los errores de Prisma incluyen en el mensaje los
+  // valores de la consulta (nombres, teléfonos)
+  const e = err as { name?: unknown; code?: unknown; stack?: unknown } | null;
+  logger.error(
+    {
+      tipo: typeof e?.name === 'string' ? e.name : 'Error',
+      code: typeof e?.code === 'string' ? e.code : undefined,
+      pila:
+        typeof e?.stack === 'string'
+          ? e.stack
+              .split('\n')
+              .filter((l) => l.trimStart().startsWith('at '))
+              .slice(0, 8)
+          : undefined,
+    },
+    'Error no controlado',
+  );
   res
     .status(500)
     .json({ error: { code: 'INTERNAL_ERROR', message: 'Error interno del servidor' } });
