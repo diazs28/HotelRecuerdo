@@ -331,7 +331,7 @@ export default function Reservas() {
             >
               ‹
             </Boton>
-            <p className="min-w-40 text-center font-semibold capitalize" aria-live="polite">
+            <p className="min-w-40 text-center font-semibold" aria-live="polite">
               {nombreMes(mes)}
             </p>
             <Boton

@@ -67,7 +67,10 @@ const fmtMomento = new Intl.DateTimeFormat('es-CO', {
 
 export const fechaCorta = (f: string) => fmtCorta.format(aUtc(f));
 export const fechaLarga = (f: string) => fmtLarga.format(aUtc(f));
-export const nombreMes = (f: string) => fmtMes.format(aUtc(f));
+export const nombreMes = (f: string) => {
+  const t = fmtMes.format(aUtc(f));
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
 export const inicialDia = (f: string) => fmtDiaSemana.format(aUtc(f));
 export const diaDelMes = (f: string) => Number(f.slice(8, 10));
 export const esFinDeSemana = (f: string) => [0, 6].includes(aUtc(f).getUTCDay());
