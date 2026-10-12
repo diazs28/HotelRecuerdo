@@ -155,6 +155,8 @@ describe('datos públicos del hotel', () => {
   });
 
   it('la disponibilidad pública es orientativa y no expone reservas', async () => {
+    // Los tipos iniciales no se publican hasta que la administración los confirma
+    await prisma.tipoHabitacion.update({ where: { nombre: 'Doble' }, data: { publicado: true } });
     const h = await crearHabitacion(2, 'Doble');
     const { token } = await sesion(srv.url, 'recepcion');
     const libre = await peticion(
