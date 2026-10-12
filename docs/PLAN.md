@@ -12,7 +12,7 @@ Una fase = una rama = un PR hacia `develop`. Esta primera entrega se construyó 
 | 5. Disponibilidad y tablero | Mapa por cama y noche, camas libres, indicadores con fórmula | ✅ |
 | 6. Huéspedes y privacidad | Datos según permisos, exportar y suprimir | ✅ |
 | 7. Sitio público | Inicio, solicitud de disponibilidad, privacidad, datos publicables | ✅ |
-| 8. Verificación | 66 pruebas de backend + 3 de frontend, revisión de seguridad y de backend | ✅ |
+| 8. Verificación | 74 pruebas de backend (incluye concurrencia y casos límite) + 3 de frontend, revisión de seguridad y de backend | ✅ |
 | 9. Próximas | Ver abajo | Pendiente |
 
 ## Próximas fases sugeridas
