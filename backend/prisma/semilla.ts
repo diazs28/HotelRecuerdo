@@ -82,7 +82,8 @@ export async function sembrarCatalogos(): Promise<void> {
   for (const t of TIPOS_HABITACION) {
     await prisma.tipoHabitacion.upsert({
       where: { nombre: t.nombre },
-      create: { ...t, descripcion: 'Tipo inicial: confirmar con la administración' },
+      // Sin publicar: el sitio no los muestra hasta que la administración confirme los tipos reales
+      create: { ...t, publicado: false },
       update: {},
     });
   }
