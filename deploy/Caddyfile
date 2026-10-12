@@ -1,6 +1,0 @@
-# HTTPS automático para el dominio del hotel (variable DOMINIO). Reenvía todo al contenedor web.
-{$DOMINIO} {
-	encode gzip
-	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
-	reverse_proxy web:8080
-}

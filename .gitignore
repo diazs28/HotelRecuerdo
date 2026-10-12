@@ -1,28 +1,6 @@
-# Dependencias y builds
 node_modules/
 dist/
-build/
-coverage/
-.turbo/
-
-# Secretos (nunca al repo)
+.vercel/
 .env
 .env.*
-!.env.example
-*.env
-!*.env.example
-.secrets/
-*.pem
-*.key
-
-# Sistema y editores
-.DS_Store
-Thumbs.db
 *.log
-.vscode/*
-!.vscode/extensions.json
-
-# Código generado (Prisma) y artefactos de pruebas
-backend/src/generated/
-playwright-report/
-test-results/

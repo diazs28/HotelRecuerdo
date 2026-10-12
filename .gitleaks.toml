@@ -1,9 +1,0 @@
-# gitleaks: reglas por defecto + excepciones revisadas a mano.
-title = "Hotel El Recuerdo"
-
-[extend]
-useDefault = true
-
-[allowlist]
-description = "Contraseñas y claves FICTICIAS de las pruebas automatizadas (no son credenciales reales)"
-paths = ['''^backend/test/''']

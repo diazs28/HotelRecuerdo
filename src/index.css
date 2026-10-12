@@ -1,0 +1,437 @@
+@import 'tailwindcss';
+@import '@fontsource/young-serif/400.css';
+@import '@fontsource-variable/source-sans-3/index.css';
+@import '@fontsource-variable/jetbrains-mono/index.css';
+
+/* Pantallas bajas (celular horizontal, laptops pequeñas): la portada se compacta */
+@custom-variant bajo (@media (max-height: 720px));
+@custom-variant muybajo (@media (max-height: 480px));
+
+/* Popayán, "la Ciudad Blanca": cal blanca, hierro forjado de los balcones, verde de portón colonial
+   y el ocre del horno de la pizzería. */
+@theme {
+  --color-cal: #f6f6f2;
+  --color-cal-2: #ecece6;
+  --color-hierro: #1d2731;
+  --color-hierro-2: #3a4652;
+  --color-piedra: #5f666d;
+  --color-linea: #d5d7d2;
+  --color-porton: #24533f;
+  --color-porton-2: #1a3f30;
+  --color-porton-claro: #dfeae3;
+  --color-ocre: #a8741a;
+  --color-ocre-texto: #7d560f;
+  --color-ocre-claro: #f4e8cf;
+  --color-ladrillo: #9a3b2b;
+  --color-ladrillo-claro: #f6e1dc;
+
+  /* Sitio público: "noche en la Ciudad Blanca". La cal brilla como luz sobre el azul de la noche
+     y el ocre del horno se vuelve brasa. El panel del personal sigue con la paleta clara. */
+  --color-noche: #070b10;
+  --color-noche-2: #0c131a;
+  --color-noche-3: #142029;
+  --color-luz: #f3efe4;
+  --color-niebla: #a3afba;
+  --color-brasa: #f0a04b;
+  --color-brasa-2: #ffc477;
+  --color-jade: #5cc59a;
+
+  --font-display: 'Young Serif', Georgia, 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Mono', monospace;
+  --font-sans: 'Source Sans 3 Variable', 'Segoe UI', system-ui, sans-serif;
+
+  /* Escala tipográfica modular (razón 1.25) */
+  --text-sm: 0.875rem;
+  --text-base: 1.0625rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5625rem;
+  --text-2xl: 1.953rem;
+  --text-3xl: 2.441rem;
+  --text-4xl: 3.052rem;
+  --text-5xl: 3.815rem;
+}
+
+@layer base {
+  html {
+    background: var(--color-cal);
+    color: var(--color-hierro);
+    font-family: var(--font-sans);
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    min-height: 100dvh;
+    line-height: 1.55;
+    font-size: var(--text-base);
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    line-height: 1.12;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-ocre);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  ::selection {
+    background: var(--color-ocre-claro);
+  }
+}
+
+/* Patrón para estados de cama que no deben depender solo del color */
+.rayado {
+  background-image: repeating-linear-gradient(-45deg, transparent 0 5px, rgb(0 0 0 / 0.14) 5px 7px);
+}
+
+/* Trazo único de la fachada al cargar la página */
+.trazo {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: trazar 2.4s cubic-bezier(0.6, 0, 0.3, 1) 0.2s forwards;
+}
+@keyframes trazar {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .trazo {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ---------- Sitio público (tema noche) ---------- */
+
+html.tema-noche {
+  background: var(--color-noche);
+  color: var(--color-luz);
+  color-scheme: dark;
+}
+html.tema-noche ::selection {
+  background: var(--color-brasa);
+  color: var(--color-noche);
+}
+html.tema-noche :focus-visible {
+  outline-color: var(--color-brasa-2);
+}
+
+@layer components {
+  /* Etiquetas técnicas del HUD */
+  .etiqueta-hud {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  /* Grano de película sobre todo el sitio: da textura a los fondos planos */
+  .grano::after {
+    content: '';
+    position: fixed;
+    inset: -50%;
+    z-index: 60;
+    pointer-events: none;
+    opacity: 0.06;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation: grano 1.2s steps(4) infinite;
+  }
+  @keyframes grano {
+    25% {
+      transform: translate(-3%, 2%);
+    }
+    50% {
+      transform: translate(2%, -3%);
+    }
+    75% {
+      transform: translate(-2%, -1%);
+    }
+  }
+
+  /* Rejilla de plano (blueprint) */
+  .rejilla {
+    background-image:
+      linear-gradient(to right, rgb(243 239 228 / 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(243 239 228 / 0.06) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  /* Texto a contorno (números y palabras gigantes de fondo) */
+  .texto-contorno {
+    color: transparent;
+    -webkit-text-stroke: 1px rgb(243 239 228 / 0.28);
+  }
+
+  /* Vidrio esmerilado para tarjetas y barras flotantes */
+  .vidrio {
+    background: rgb(12 19 26 / 0.62);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid rgb(243 239 228 / 0.1);
+  }
+
+  /* Botón principal con brillo de brasa */
+  .boton-brasa {
+    background: linear-gradient(180deg, var(--color-brasa-2), var(--color-brasa));
+    color: var(--color-noche);
+    box-shadow:
+      0 0 0 1px rgb(255 196 119 / 0.4),
+      0 10px 40px -10px rgb(240 160 75 / 0.65);
+    transition:
+      transform 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+  .boton-brasa:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 0 0 1px rgb(255 196 119 / 0.6),
+      0 16px 50px -10px rgb(240 160 75 / 0.85);
+  }
+
+  /* Palabras gigantes letra por letra: emergen desde abajo de su caja y se hunden al salir */
+  .letra {
+    display: inline-block;
+    will-change: transform;
+  }
+  .letra-entra {
+    animation: letra-entra 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .letra-sale {
+    animation: letra-sale 0.45s cubic-bezier(0.55, 0, 0.75, 0) both;
+  }
+  @keyframes letra-entra {
+    from {
+      transform: translateY(105%);
+    }
+  }
+  @keyframes letra-sale {
+    to {
+      transform: translateY(-105%);
+    }
+  }
+
+  /* Carrusel: la imagen nueva entra con una cortina y un leve zoom */
+  @keyframes cortina-derecha {
+    from {
+      clip-path: inset(0 0 0 100%);
+      transform: scale(1.12);
+    }
+  }
+  @keyframes cortina-izquierda {
+    from {
+      clip-path: inset(0 100% 0 0);
+      transform: scale(1.12);
+    }
+  }
+  .cortina-derecha {
+    animation: cortina-derecha 0.85s cubic-bezier(0.77, 0, 0.18, 1) both;
+  }
+  .cortina-izquierda {
+    animation: cortina-izquierda 0.85s cubic-bezier(0.77, 0, 0.18, 1) both;
+  }
+
+  /* Brillo que sigue al puntero en las tarjetas (usa --mx y --my) */
+  .brillo-puntero {
+    background: radial-gradient(
+      420px circle at var(--mx, 50%) var(--my, 50%),
+      rgb(255 196 119 / 0.13),
+      transparent 45%
+    );
+  }
+
+  /* Cinta de texto infinita */
+  .cinta {
+    animation: cinta 38s linear infinite;
+  }
+  @keyframes cinta {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  /* Indicador de desplazamiento */
+  .pulso-linea {
+    animation: pulso-linea 2.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+    transform-origin: top;
+  }
+  @keyframes pulso-linea {
+    0% {
+      transform: scaleY(0);
+    }
+    50% {
+      transform: scaleY(1);
+      transform-origin: top;
+    }
+    51% {
+      transform-origin: bottom;
+    }
+    100% {
+      transform: scaleY(0);
+      transform-origin: bottom;
+    }
+  }
+
+  /* Aparición al entrar en pantalla (la clase .visible la pone un IntersectionObserver) */
+  .revelar {
+    opacity: 0;
+    transform: translateY(28px);
+    filter: blur(6px);
+    transition:
+      opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+      filter 0.9s ease;
+    transition-delay: calc(var(--retraso, 0) * 90ms);
+  }
+  .revelar.visible {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+/* Transición entre páginas (View Transitions): la página nueva sube como una cortina */
+::view-transition-old(root) {
+  animation: 0.55s cubic-bezier(0.7, 0, 0.3, 1) both pagina-sale;
+}
+::view-transition-new(root) {
+  animation: 0.75s cubic-bezier(0.7, 0, 0.3, 1) both pagina-entra;
+}
+@keyframes pagina-sale {
+  to {
+    opacity: 0.35;
+    transform: scale(0.96);
+    filter: blur(4px);
+  }
+}
+@keyframes pagina-entra {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grano::after {
+    animation: none;
+  }
+  .revelar {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}
+
+/* Experiencias: los colores del ambiente cambian con una transición suave */
+@property --c1 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #5cc59a;
+}
+@property --c2 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #1f6f5a;
+}
+.ambiente {
+  transition:
+    --c1 0.9s ease,
+    --c2 0.9s ease;
+}
+.orbe {
+  background:
+    radial-gradient(circle at 35% 30%, rgb(255 255 255 / 0.35), transparent 40%),
+    conic-gradient(from 0deg, var(--c1), var(--c2), transparent 60%, var(--c1));
+  mask: radial-gradient(circle, transparent 52%, black 53%, black 70%, transparent 71%);
+  animation: orbe 14s linear infinite;
+  opacity: 0.55;
+}
+@keyframes orbe {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.panel-entra {
+  animation: panel-entra 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes panel-entra {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+    filter: blur(6px);
+  }
+}
+
+/* Explorador 3D: se abre como un portal circular */
+.portal-abre {
+  animation: portal-abre 0.9s cubic-bezier(0.77, 0, 0.18, 1) both;
+}
+@keyframes portal-abre {
+  from {
+    clip-path: circle(0% at 50% 55%);
+  }
+  to {
+    clip-path: circle(150% at 50% 55%);
+  }
+}
+dialog::backdrop {
+  background: rgb(7 11 16 / 0.8);
+}
+
+/* Restaurante: el "1979" encendido se ve solo dentro de la linterna (sigue al puntero; en
+   pantallas táctiles recorre el número sola) */
+@property --x {
+  syntax: '<length-percentage>';
+  inherits: true;
+  initial-value: 50%;
+}
+@property --y {
+  syntax: '<length-percentage>';
+  inherits: true;
+  initial-value: 50%;
+}
+.linterna-luz {
+  mask-image: radial-gradient(circle 11rem at var(--x) var(--y), black 25%, transparent 75%);
+  -webkit-mask-image: radial-gradient(
+    circle 11rem at var(--x) var(--y),
+    black 25%,
+    transparent 75%
+  );
+}
+.linterna:not([data-siguiendo]) {
+  animation: linterna-sola 9s ease-in-out infinite;
+}
+@keyframes linterna-sola {
+  0%,
+  100% {
+    --x: 12%;
+    --y: 40%;
+  }
+  33% {
+    --x: 55%;
+    --y: 70%;
+  }
+  66% {
+    --x: 88%;
+    --y: 35%;
+  }
+}
