@@ -1,0 +1,56 @@
+# Ajustes de PRODUCCIÓN sobre docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Diferencias con desarrollo:
+#   - PostgreSQL no publica su puerto (solo la red interna de Compose).
+#   - Caddy delante del sitio: HTTPS automático con Let's Encrypt para DOMINIO.
+#   - El sitio web no publica puerto propio; solo Caddy expone 80/443.
+#   - La API confía en 2 proxies (Caddy y nginx) para leer la IP real del visitante.
+#   - Sin la base de pruebas.
+#   - Reinicio automático siempre.
+services:
+  db:
+    ports: !reset []
+    restart: always
+    # Sin el script que crea la base de pruebas
+    volumes: !override
+      - hotel_pgdata:/var/lib/postgresql/data
+
+  api:
+    restart: always
+    environment:
+      CORS_ORIGINS: https://${DOMINIO:?Define DOMINIO en .env}
+      # Caddy + nginx delante de la API
+      TRUST_PROXY: 2
+      LOG_LEVEL: info
+
+  migraciones:
+    environment:
+      TRUST_PROXY: 2
+
+  web:
+    build:
+      args:
+        SITIO_URL: https://${DOMINIO:?Define DOMINIO en .env}
+    ports: !reset []
+    restart: always
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: always
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      DOMINIO: ${DOMINIO:?Define DOMINIO en .env}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_datos:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_datos:
+  caddy_config:
