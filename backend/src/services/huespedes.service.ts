@@ -1,8 +1,8 @@
 // Huéspedes: datos mínimos, exposición según permisos y derechos del titular (Ley 1581 de 2012:
 // conocer y suprimir). No se afirma cumplimiento legal certificado: ver docs/PRIVACIDAD.md.
 
-import type { Prisma } from '../generated/prisma/client.js';
-import { prisma } from '../lib/prisma.js';
+import { Prisma } from '../generated/prisma/client.js';
+import { prisma, type Tx } from '../lib/prisma.js';
 import { AppError } from '../utils/AppError.js';
 import { deFechaBd } from '../domain/fechas.js';
 import { codigoReserva } from '../domain/estadosReserva.js';
@@ -12,6 +12,11 @@ import { registrarAuditoria } from './auditoria.service.js';
 import { huespedSelect } from './reservas.presentacion.js';
 
 const noEncontrado = () => new AppError(404, 'Huésped no encontrado', 'NOT_FOUND');
+
+// Serializa editar, anonimizar y crear reservas del mismo huésped
+async function bloquearHuesped(tx: Tx, id: string): Promise<void> {
+  await tx.$queryRaw(Prisma.sql`SELECT id FROM huespedes WHERE id = ${id}::uuid FOR UPDATE`);
+}
 
 export async function listarHuespedes(filtros: ListarHuespedesQuery, permisos: PermisosDatos) {
   const q = filtros.q;
@@ -90,6 +95,7 @@ export async function actualizarHuesped(
   permisos: PermisosDatos,
 ) {
   await prisma.$transaction(async (tx) => {
+    await bloquearHuesped(tx, id);
     const actual = await tx.huesped.findUnique({
       where: { id },
       select: { anonimizadoEn: true, telefono: true, email: true },
@@ -176,6 +182,7 @@ export async function exportarHuesped(id: string, usuarioId: string) {
 // operativo (fechas, estados) sin identificar a la persona.
 export async function anonimizarHuesped(id: string, usuarioId: string) {
   await prisma.$transaction(async (tx) => {
+    await bloquearHuesped(tx, id);
     const h = await tx.huesped.findUnique({ where: { id }, select: { anonimizadoEn: true } });
     if (!h) throw noEncontrado();
     if (h.anonimizadoEn) throw new AppError(409, 'El huésped ya fue anonimizado', 'YA_ANONIMIZADO');
@@ -206,7 +213,11 @@ export async function anonimizarHuesped(id: string, usuarioId: string) {
       },
     });
     // Los comentarios escritos por el huésped pueden contener datos personales
-    await tx.reserva.updateMany({ where: { huespedId: id }, data: { comentarioHuesped: null } });
+    // La huella de idempotencia es un hash de nombre, teléfono y correo: también se borra
+    await tx.reserva.updateMany({
+      where: { huespedId: id },
+      data: { comentarioHuesped: null, claveIdempotencia: null, huellaSolicitud: null },
+    });
     await registrarAuditoria(tx, {
       usuarioId,
       accion: 'huesped.anonimizado',

@@ -2,30 +2,20 @@ import { Prisma } from '../generated/prisma/client.js';
 import { prisma, type Tx } from '../lib/prisma.js';
 import { AppError } from '../utils/AppError.js';
 import { huellaDe } from '../utils/huella.js';
-import { aFechaBd, deFechaBd, hoyEnHotel, validarRangoEstancia } from '../domain/fechas.js';
-import {
-  ESTADOS_EDITABLES,
-  capacidadSuficiente,
-  numeroDesdeCodigo,
-  type EstadoReserva,
-} from '../domain/estadosReserva.js';
+import { esUnicoRepetido } from '../utils/erroresBd.js';
+import { aFechaBd } from '../domain/fechas.js';
+import { numeroDesdeCodigo } from '../domain/estadosReserva.js';
 import type { PermisosDatos } from '../domain/privacidad.js';
-import type {
-  ActualizarReservaInput,
-  CrearReservaInput,
-  ListarReservasQuery,
-} from '../schemas/reservas.schema.js';
+import type { CrearReservaInput, ListarReservasQuery } from '../schemas/reservas.schema.js';
 import { historialDe, registrarAuditoria } from './auditoria.service.js';
 import {
-  bloquearReserva,
+  bloquearCamas,
   conControlDeCruces,
   crearOcupacionesReserva,
-  moverOcupacionesReserva,
 } from './ocupaciones.service.js';
 import { resolverCamasAsignables } from './asignaciones.service.js';
 import {
   leerReserva,
-  plazasAsignadas,
   presentarReserva,
   reservaSelect,
   type ReservaPresentada,
@@ -102,11 +92,7 @@ export async function reservaPorClave(clave: string, huella: string): Promise<st
 }
 
 export function esConflictoDeClave(err: unknown): boolean {
-  return (
-    err instanceof Prisma.PrismaClientKnownRequestError &&
-    err.code === 'P2002' &&
-    JSON.stringify(err.meta ?? {}).includes('clave_idempotencia')
-  );
+  return esUnicoRepetido(err, 'clave_idempotencia');
 }
 
 // ---------- Crear ----------
@@ -152,6 +138,18 @@ export async function crearReserva(
             },
             select: { id: true },
           });
+          const activas = await bloquearCamas(
+            tx,
+            camas.map((c) => c.id),
+            'compartido',
+          );
+          if (camas.some((c) => !activas.has(c.id))) {
+            throw new AppError(
+              409,
+              'Alguna cama fue retirada mientras se asignaba',
+              'CAMA_INVALIDA',
+            );
+          }
           await crearOcupacionesReserva(
             tx,
             reserva.id,
@@ -214,10 +212,11 @@ async function crearHuesped(tx: Tx, datos: CrearReservaInput): Promise<string> {
 }
 
 async function validarHuespedActivo(tx: Tx, huespedId: string): Promise<void> {
-  const h = await tx.huesped.findUnique({
-    where: { id: huespedId },
-    select: { anonimizadoEn: true },
-  });
+  // Bloqueo compartido: el huésped no puede anonimizarse mientras se le crea una reserva
+  const filas = await tx.$queryRaw<Array<{ anonimizado_en: Date | null }>>(
+    Prisma.sql`SELECT anonimizado_en FROM huespedes WHERE id = ${huespedId}::uuid FOR SHARE`,
+  );
+  const h = filas[0] ? { anonimizadoEn: filas[0].anonimizado_en } : null;
   if (!h) {
     throw new AppError(422, 'El huésped no existe', 'HUESPED_INVALIDO', [
       { path: 'huespedId', message: 'Selecciona un huésped existente' },
@@ -226,142 +225,6 @@ async function validarHuespedActivo(tx: Tx, huespedId: string): Promise<void> {
   if (h.anonimizadoEn) {
     throw new AppError(409, 'Los datos de este huésped fueron suprimidos', 'HUESPED_ANONIMIZADO');
   }
-}
-
-// ---------- Editar ----------
-
-// Campos que se pueden editar según el estado (docs/adr/0004)
-function camposPermitidos(estado: EstadoReserva): ReadonlySet<keyof ActualizarReservaInput> {
-  if (ESTADOS_EDITABLES.includes(estado)) {
-    return new Set([
-      'fechaEntrada',
-      'fechaSalida',
-      'cantidadHuespedes',
-      'canalId',
-      'tipoHabitacionPreferidoId',
-      'notasOperativas',
-      'responsableId',
-    ]);
-  }
-  if (estado === 'EN_ALOJAMIENTO') {
-    return new Set(['fechaSalida', 'cantidadHuespedes', 'notasOperativas', 'responsableId']);
-  }
-  return new Set(['notasOperativas']);
-}
-
-export async function actualizarReserva(
-  id: string,
-  datos: ActualizarReservaInput,
-  usuarioId: string,
-  permisos: PermisosDatos,
-): Promise<ReservaPresentada> {
-  const actual = await leerReserva(prisma, id);
-  const entrada = datos.fechaEntrada ?? deFechaBd(actual.fechaEntrada);
-  const salida = datos.fechaSalida ?? deFechaBd(actual.fechaSalida);
-
-  await conControlDeCruces(
-    () =>
-      prisma.$transaction(async (tx) => {
-        await bloquearReserva(tx, id);
-        const r = await leerReserva(tx, id);
-
-        const permitidos = camposPermitidos(r.estado);
-        const noPermitidos = (Object.keys(datos) as (keyof ActualizarReservaInput)[]).filter(
-          (k) => !permitidos.has(k),
-        );
-        if (noPermitidos.length > 0) {
-          throw new AppError(
-            409,
-            'Ese dato ya no se puede cambiar en el estado actual de la reserva',
-            'CAMPO_NO_EDITABLE',
-            noPermitidos.map((k) => ({ path: k, message: 'No editable en este estado' })),
-          );
-        }
-
-        const errorRango = validarRangoEstancia(entrada, salida);
-        if (errorRango) {
-          throw new AppError(
-            400,
-            'La fecha de salida debe ser posterior a la de entrada',
-            errorRango,
-            [{ path: 'fechaSalida', message: 'Revisa las fechas de la estancia' }],
-          );
-        }
-        if (
-          r.estado === 'EN_ALOJAMIENTO' &&
-          datos.fechaSalida &&
-          datos.fechaSalida < hoyEnHotel()
-        ) {
-          throw new AppError(409, 'La nueva salida no puede ser anterior a hoy', 'FECHA_INVALIDA', [
-            { path: 'fechaSalida', message: 'Usa una fecha de hoy en adelante' },
-          ]);
-        }
-
-        const cantidad = datos.cantidadHuespedes ?? r.cantidadHuespedes;
-        if (
-          (r.estado === 'CONFIRMADA' || r.estado === 'EN_ALOJAMIENTO') &&
-          !capacidadSuficiente(plazasAsignadas(r), cantidad)
-        ) {
-          throw new AppError(
-            409,
-            'Las camas asignadas no alcanzan para esa cantidad de huéspedes; asigna más camas primero',
-            'CAPACIDAD_INSUFICIENTE',
-          );
-        }
-
-        await validarReferencias(tx, datos);
-
-        const cambiaFechas =
-          entrada !== deFechaBd(r.fechaEntrada) || salida !== deFechaBd(r.fechaSalida);
-        await tx.reserva.update({
-          where: { id },
-          data: {
-            ...(cambiaFechas
-              ? { fechaEntrada: aFechaBd(entrada), fechaSalida: aFechaBd(salida) }
-              : {}),
-            ...(datos.cantidadHuespedes !== undefined
-              ? { cantidadHuespedes: datos.cantidadHuespedes }
-              : {}),
-            ...(datos.canalId !== undefined ? { canalId: datos.canalId } : {}),
-            ...(datos.tipoHabitacionPreferidoId !== undefined
-              ? { tipoHabitacionPreferidoId: datos.tipoHabitacionPreferidoId }
-              : {}),
-            ...(datos.notasOperativas !== undefined
-              ? { notasOperativas: datos.notasOperativas }
-              : {}),
-            ...(datos.responsableId !== undefined ? { responsableId: datos.responsableId } : {}),
-          },
-        });
-        if (cambiaFechas) await moverOcupacionesReserva(tx, id, entrada, salida);
-
-        await registrarAuditoria(tx, {
-          usuarioId,
-          accion: 'reserva.actualizada',
-          entidad: 'reserva',
-          entidadId: id,
-          datos: {
-            campos: Object.keys(datos),
-            ...(cambiaFechas
-              ? {
-                  fechasAntes: [deFechaBd(r.fechaEntrada), deFechaBd(r.fechaSalida)],
-                  fechasDespues: [entrada, salida],
-                }
-              : {}),
-            ...(datos.cantidadHuespedes !== undefined
-              ? { cantidadAntes: r.cantidadHuespedes, cantidadDespues: datos.cantidadHuespedes }
-              : {}),
-          },
-        });
-      }),
-    {
-      camaIds: () => actual.ocupaciones.map((o) => o.cama.id),
-      inicio: entrada,
-      fin: salida,
-      excluir: { reservaId: id },
-    },
-  );
-
-  return presentarReserva(await leerReserva(prisma, id), permisos);
 }
 
 // ---------- Consultar ----------

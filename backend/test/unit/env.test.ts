@@ -12,6 +12,13 @@ describe('validación del entorno al arrancar', () => {
     assert.deepEqual(erroresDeEnv({ ...base, NODE_ENV: 'development' }), []);
   });
 
+  it('las variables vacías usan su valor por defecto', () => {
+    assert.deepEqual(
+      erroresDeEnv({ ...base, RATE_LIMIT_MAX: '', JWT_ISSUER: '', API_DOCS_ENABLED: '' }),
+      [],
+    );
+  });
+
   it('exige DATABASE_URL y un JWT_SECRET de al menos 32 caracteres', () => {
     const errores = erroresDeEnv({ NODE_ENV: 'development', JWT_SECRET: 'corto' });
     assert.ok(errores.some((e) => e.startsWith('DATABASE_URL')));

@@ -59,8 +59,15 @@ export const reservaSelect = {
 
 export type ReservaBd = Prisma.ReservaGetPayload<{ select: typeof reservaSelect }>;
 
-export function plazasAsignadas(r: Pick<ReservaBd, 'ocupaciones'>): number {
-  return r.ocupaciones.reduce((suma, o) => suma + o.cama.plazas, 0);
+// Camas vigentes: las que llegan hasta la salida de la reserva. Una cama quitada a mitad de una
+// estancia conserva sus noches pasadas (historial) pero ya no cuenta como asignada.
+export function ocupacionesVigentes(r: Pick<ReservaBd, 'ocupaciones' | 'fechaSalida'>) {
+  const salida = r.fechaSalida.getTime();
+  return r.ocupaciones.filter((o) => o.fechaFin?.getTime() === salida);
+}
+
+export function plazasAsignadas(r: Pick<ReservaBd, 'ocupaciones' | 'fechaSalida'>): number {
+  return ocupacionesVigentes(r).reduce((suma, o) => suma + o.cama.plazas, 0);
 }
 
 export function presentarReserva(r: ReservaBd, permisos: PermisosDatos) {
@@ -87,7 +94,7 @@ export function presentarReserva(r: ReservaBd, permisos: PermisosDatos) {
     responsable: r.responsable,
     creadoPor: r.creadoPor,
     huesped: presentarHuesped(r.huesped, permisos),
-    camas: r.ocupaciones.map((o) => ({
+    camas: ocupacionesVigentes(r).map((o) => ({
       ocupacionId: o.id,
       camaId: o.cama.id,
       identificador: o.cama.identificador,

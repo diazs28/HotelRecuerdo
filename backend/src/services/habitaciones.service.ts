@@ -1,7 +1,8 @@
 // Habitaciones y camas. La distribución real (cuántas camas por habitación, de qué tipo) la configura
 // el personal; el sistema no asume que "20 habitaciones y 37 camas" defina cómo se reparten.
 
-import { Prisma } from '../generated/prisma/client.js';
+import type { Prisma } from '../generated/prisma/client.js';
+import { esUnicoRepetido } from '../utils/erroresBd.js';
 import { prisma, type Tx } from '../lib/prisma.js';
 import { AppError } from '../utils/AppError.js';
 import { aFechaBd, deFechaBd, hoyEnHotel } from '../domain/fechas.js';
@@ -12,7 +13,7 @@ import type {
   CrearHabitacionInput,
 } from '../schemas/habitaciones.schema.js';
 import { registrarAuditoria } from './auditoria.service.js';
-import { crearOcupacionesBloqueo } from './ocupaciones.service.js';
+import { bloquearCamas, crearOcupacionesBloqueo } from './ocupaciones.service.js';
 
 const habitacionSelect = {
   id: true,
@@ -38,14 +39,6 @@ const identificadorRepetido = () =>
   new AppError(409, 'Ya hay una cama con ese identificador en la habitación', 'CAMA_REPETIDA', [
     { path: 'identificador', message: 'Usa otro identificador' },
   ]);
-
-function esUnicoRepetido(err: unknown, indice: string): boolean {
-  return (
-    err instanceof Prisma.PrismaClientKnownRequestError &&
-    err.code === 'P2002' &&
-    JSON.stringify(err.meta ?? {}).includes(indice)
-  );
-}
 
 async function validarTipo(tx: Tx, tipoHabitacionId: string): Promise<void> {
   const tipo = await tx.tipoHabitacion.findUnique({
@@ -141,6 +134,8 @@ export async function actualizarHabitacion(
       const retirar = datos.activa === false && actual.activa;
       if (retirar) {
         const camaIds = actual.camas.map((c) => c.id);
+        // Bloqueo exclusivo: nadie puede asignar estas camas mientras se comprueba y se retiran
+        await bloquearCamas(tx, camaIds, 'exclusivo');
         if ((await reservasFuturas(tx, camaIds)) > 0) throw tieneReservas('la habitación');
         await tx.cama.updateMany({ where: { habitacionId: id }, data: { activa: false } });
       }
@@ -225,6 +220,9 @@ export async function actualizarCama(
         select: { activa: true, plazas: true },
       });
       if (!cama) throw new AppError(404, 'Cama no encontrada', 'NOT_FOUND');
+      if (datos.activa === false || datos.plazas !== undefined) {
+        await bloquearCamas(tx, [camaId], 'exclusivo');
+      }
       if (datos.activa === false && cama.activa && (await reservasFuturas(tx, [camaId])) > 0) {
         throw tieneReservas('la cama');
       }

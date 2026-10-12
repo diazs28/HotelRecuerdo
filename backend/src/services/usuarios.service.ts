@@ -1,6 +1,7 @@
 // Autenticación del personal, usuarios y roles con permisos configurables.
 
-import { Prisma } from '../generated/prisma/client.js';
+import type { Prisma } from '../generated/prisma/client.js';
+import { esUnicoRepetido } from '../utils/erroresBd.js';
 import { prisma } from '../lib/prisma.js';
 import { firmarToken } from '../lib/jwt.js';
 import { hashPassword, necesitaRehash, verificarCredencial } from '../lib/password.js';
@@ -151,19 +152,11 @@ export async function crearUsuario(datos: CrearUsuarioInput, usuarioId: string) 
       return u;
     });
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+    if (esUnicoRepetido(err)) {
       throw emailRepetido();
     }
     throw err;
   }
-}
-
-// Debe quedar al menos un administrador activo
-async function quedariaSinAdministradores(usuarioId: string): Promise<boolean> {
-  const otros = await prisma.usuario.count({
-    where: { id: { not: usuarioId }, activo: true, rol: { codigo: ROL_ADMINISTRADOR } },
-  });
-  return otros === 0;
 }
 
 export async function actualizarUsuario(
@@ -178,18 +171,29 @@ export async function actualizarUsuario(
   if (!actual) throw new AppError(404, 'Usuario no encontrado', 'NOT_FOUND');
   if (datos.rolId) await validarRol(datos.rolId);
 
+  const { password, ...resto } = datos;
+  const rolNuevo = datos.rolId
+    ? await prisma.rol.findUnique({ where: { id: datos.rolId }, select: { codigo: true } })
+    : null;
   const pierdeAdmin =
     actual.rol.codigo === ROL_ADMINISTRADOR &&
-    (datos.activo === false ||
-      (datos.rolId !== undefined &&
-        (await prisma.rol.findUnique({ where: { id: datos.rolId }, select: { codigo: true } }))
-          ?.codigo !== ROL_ADMINISTRADOR));
-  if (pierdeAdmin && (await quedariaSinAdministradores(id))) {
-    throw new AppError(409, 'Debe quedar al menos un administrador activo', 'ULTIMO_ADMINISTRADOR');
-  }
+    (datos.activo === false || (rolNuevo !== null && rolNuevo.codigo !== ROL_ADMINISTRADOR));
 
-  const { password, ...resto } = datos;
   return prisma.$transaction(async (tx) => {
+    if (pierdeAdmin) {
+      // Un solo cambio de administradores a la vez: dos personas no pueden desactivarse mutuamente
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('ultimo-administrador'))`;
+      const otros = await tx.usuario.count({
+        where: { id: { not: id }, activo: true, rol: { codigo: ROL_ADMINISTRADOR } },
+      });
+      if (otros === 0) {
+        throw new AppError(
+          409,
+          'Debe quedar al menos un administrador activo',
+          'ULTIMO_ADMINISTRADOR',
+        );
+      }
+    }
     const u = await tx.usuario.update({
       where: { id },
       data: {

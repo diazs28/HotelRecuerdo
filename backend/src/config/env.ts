@@ -104,12 +104,19 @@ export const envSchema = z
 export type Env = z.infer<typeof envSchema>;
 
 // Devuelve los errores SOLO con el nombre de la variable y el motivo, nunca su valor
+// Las variables vacías (ej. `RATE_LIMIT_MAX=` copiado de .env.example) cuentan como no definidas
+function sinVacias(valores: Record<string, string | undefined>) {
+  return Object.fromEntries(
+    Object.entries(valores).filter(([, v]) => v !== undefined && v.trim() !== ''),
+  );
+}
+
 export function erroresDeEnv(valores: Record<string, string | undefined>): string[] {
-  const r = envSchema.safeParse(valores);
+  const r = envSchema.safeParse(sinVacias(valores));
   return r.success ? [] : r.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`);
 }
 
-const parsed = envSchema.safeParse(process.env);
+const parsed = envSchema.safeParse(sinVacias(process.env));
 
 if (!parsed.success) {
   const issues = parsed.error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n');

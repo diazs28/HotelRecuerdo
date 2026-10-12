@@ -8,7 +8,11 @@ import { AppError } from '../utils/AppError.js';
 import { aFechaBd, deFechaBd, hoyEnHotel } from '../domain/fechas.js';
 import type { CrearBloqueoInput } from '../schemas/habitaciones.schema.js';
 import { registrarAuditoria } from './auditoria.service.js';
-import { conControlDeCruces, crearOcupacionesBloqueo } from './ocupaciones.service.js';
+import {
+  conControlDeCruces,
+  cortarOcupacionesDesde,
+  crearOcupacionesBloqueo,
+} from './ocupaciones.service.js';
 
 const bloqueoSelect = {
   id: true,
@@ -132,31 +136,21 @@ export async function liberarBloqueo(id: string, usuarioId: string) {
       throw new AppError(409, 'El bloqueo ya terminó', 'YA_TERMINADO');
     }
 
-    const ahora = new Date();
     const yaEmpezo = deFechaBd(b.fechaInicio) < hoy;
     // Liberación condicional: si otra persona lo liberó al mismo tiempo, no se repite
     const r = await tx.bloqueo.updateMany({
       where: { id, liberadoEn: null },
       data: {
-        liberadoEn: ahora,
+        liberadoEn: new Date(),
         liberadoPorId: usuarioId,
         ...(yaEmpezo ? { fechaFin: aFechaBd(hoy) } : {}),
       },
     });
     if (r.count !== 1) throw new AppError(409, 'El bloqueo ya fue liberado', 'YA_LIBERADO');
 
-    if (yaEmpezo) {
-      // Recortar fecha_fin nunca crea cruces: solo libera noches
-      await tx.ocupacion.updateMany({
-        where: { bloqueoId: id, activa: true },
-        data: { fechaFin: aFechaBd(hoy) },
-      });
-    } else {
-      await tx.ocupacion.updateMany({
-        where: { bloqueoId: id, activa: true },
-        data: { activa: false, liberadaEn: ahora },
-      });
-    }
+    // Cada cama según su propia ocupación: una cama agregada hoy a una habitación bloqueada tiene
+    // su ocupación desde hoy y se anula completa (no queda un rango vacío)
+    await cortarOcupacionesDesde(tx, { bloqueoId: id }, hoy);
     await registrarAuditoria(tx, {
       usuarioId,
       accion: 'bloqueo.liberado',
