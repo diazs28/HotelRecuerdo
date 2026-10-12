@@ -7,7 +7,7 @@ export default {
     'scope-enum': [
       2,
       'always',
-      ['frontend', 'backend', 'db', 'pagos', 'admin', 'ui', 'seo', 'docs', 'ci', 'deps', 'repo'],
+      ['frontend', 'backend', 'db', 'reservas', 'habitaciones', 'publico', 'panel', 'docker', 'docs', 'ci', 'deps', 'repo'],
     ],
     // Los asuntos van en español y pueden empezar con mayúscula o nombre propio.
     'subject-case': [0],
