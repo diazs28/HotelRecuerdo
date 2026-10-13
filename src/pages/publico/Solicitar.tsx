@@ -164,7 +164,10 @@ export function Solicitar() {
             <h1 className="text-4xl">Recibimos tu solicitud</h1>
             {MODO_DEMO && (
               <p className="mt-3 rounded-md bg-ocre-claro px-3 py-2 text-sm text-ocre-texto">
-                {envio.data.mensaje}
+                {envio.data.mensaje}{' '}
+                <Link to="/panel/reservas" className="font-semibold underline underline-offset-4">
+                  Verla en el panel
+                </Link>
               </p>
             )}
             {envio.data.codigo && (

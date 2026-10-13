@@ -2,10 +2,13 @@
 
 ## Descripción
 
-Copia del **sitio público** de Hotel El Recuerdo en *modo demostración*, para mostrarla a
-clientes. Funciona sin API ni base de datos: el formulario de solicitud responde con un código
-de ejemplo y **no envía nada**; el panel del personal no está disponible. La página lleva la
-cabecera `noindex` para que los buscadores no la confundan con el sitio oficial.
+Copia del **sitio público y del panel del personal** de Hotel El Recuerdo en *modo demostración*,
+para mostrarla a clientes. Funciona sin API ni base de datos: una API simulada en el navegador
+responde con datos de ejemplo (20 habitaciones, 37 camas, huéspedes ficticios y reservas alrededor
+de hoy) y aplica las mismas reglas del sistema real. Los cambios se guardan solo en la pestaña de
+quien la visita y nada se envía al hotel. En `/panel` se entra con un clic como Administración o
+como Recepción (contraseña de ejemplo: `demo`). La página lleva la cabecera `noindex` para
+que los buscadores no la confundan con el sitio oficial.
 
 El código fuente vive en el proyecto `hotel-el-recuerdo/frontend`. Esta carpeta se genera con
 su script `scripts/exportar-demo.mjs`; **no edites aquí**: cambia el proyecto y vuelve a exportar.

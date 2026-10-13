@@ -6,6 +6,7 @@ import { actualizarUsuarioSesion, limpiarSesion } from '../../api/session';
 import { useSesion } from '../../hooks/useSesion';
 import { MARCA } from '../../config/marca';
 import { cx } from '../ui';
+import { MODO_DEMO } from '../../api/demo';
 
 const MENU: Array<{ a: string; texto: string; permiso?: string; fin?: boolean }> = [
   { a: '/panel', texto: 'Tablero', permiso: 'tablero:ver', fin: true },
@@ -18,6 +19,13 @@ const MENU: Array<{ a: string; texto: string; permiso?: string; fin?: boolean }>
   { a: '/panel/auditoria', texto: 'Auditoría', permiso: 'auditoria:ver' },
   { a: '/panel/cuenta', texto: 'Mi cuenta' },
 ];
+
+// Demostración: vuelve a los datos de ejemplo iniciales
+async function reiniciarDemo() {
+  const { reiniciarDb } = await import('../../api/simulacion/almacen');
+  reiniciarDb();
+  window.location.reload();
+}
 
 export default function LayoutPanel() {
   const sesion = useSesion();
@@ -105,6 +113,18 @@ export default function LayoutPanel() {
           <div className="mt-6 border-t border-white/15 px-3 pt-4 text-sm">
             <p className="font-semibold">{sesion?.usuario.nombre}</p>
             <p className="text-cal/70">{sesion?.usuario.rol.nombre}</p>
+            {MODO_DEMO && (
+              <div className="mt-3 rounded-md bg-white/10 p-2 text-xs text-cal/85">
+                Demostración con datos de ejemplo: los cambios se guardan solo en esta pestaña.
+                <button
+                  type="button"
+                  onClick={reiniciarDemo}
+                  className="mt-1 block font-semibold text-cal underline underline-offset-4"
+                >
+                  Reiniciar datos de ejemplo
+                </button>
+              </div>
+            )}
             <button
               type="button"
               onClick={salir}

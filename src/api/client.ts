@@ -1,5 +1,6 @@
 import { ApiError, mensajeAmigable, type DetalleValidacion } from './errors';
 import { limpiarSesion, obtenerToken } from './session';
+import { MODO_DEMO } from './demo';
 
 // ÚNICO punto del frontend que hace fetch. La API vive en el mismo origen (/api): en desarrollo la
 // reenvía Vite y en Docker el contenedor web (nginx).
@@ -56,6 +57,17 @@ export async function peticion<T>(ruta: string, opciones: OpcionesPeticion = {})
     const token = obtenerToken();
     if (!token) throw new ApiError(401, 'UNAUTHORIZED', mensajeAmigable(401, 'UNAUTHORIZED'));
     headers.Authorization = `Bearer ${token}`;
+  }
+
+  // Demostración: responde la API simulada del navegador (sin red ni base de datos)
+  if (MODO_DEMO) {
+    const { responder } = await import('./simulacion/servidor');
+    try {
+      return await responder<T>(ruta, { method, body, query, token: obtenerToken() });
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401 && auth) limpiarSesion('expirada');
+      throw e;
+    }
   }
 
   const timeout = AbortSignal.timeout(TIMEOUT_MS);

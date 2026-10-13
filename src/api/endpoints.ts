@@ -1,5 +1,4 @@
 import { peticion } from './client';
-import { MODO_DEMO, publicoDemo } from './demo';
 import type { UsuarioSesion } from './session';
 import type {
   Ajuste,
@@ -29,7 +28,7 @@ const auth = true;
 
 // ---------- Público ----------
 
-const publicoReal = {
+export const publico = {
   hotel: () => peticion<DatosPublicos>('/publico/hotel'),
   disponibilidad: (q: { fechaEntrada: string; fechaSalida: string; cantidadHuespedes: number }) =>
     peticion<DisponibilidadPublica>('/publico/disponibilidad', { query: { ...q } }),
@@ -39,9 +38,6 @@ const publicoReal = {
       { method: 'POST', body, headers: { 'Idempotency-Key': claveIdempotencia } },
     ),
 };
-
-// En modo demostración el sitio público no llama a la API (ver api/demo.ts)
-export const publico: typeof publicoReal = MODO_DEMO ? publicoDemo : publicoReal;
 
 // ---------- Sesión ----------
 

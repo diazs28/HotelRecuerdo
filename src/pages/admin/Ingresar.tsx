@@ -7,6 +7,8 @@ import { mensajeDeError } from '../../api/errors';
 import { Aviso, Boton, Campo } from '../../components/ui';
 import { MARCA } from '../../config/marca';
 import { useSesion, useTitulo } from '../../hooks/useSesion';
+import { MODO_DEMO } from '../../api/demo';
+import { USUARIOS_DEMO } from '../../api/simulacion/permisos';
 
 // Solo rutas internas del panel (evita redirecciones a sitios externos)
 function destinoSeguro(valor: string | null): string {
@@ -21,7 +23,9 @@ export default function Ingresar() {
   const [password, setPassword] = useState('');
 
   const login = useMutation({
-    mutationFn: () => sesionApi.login(email.trim(), password),
+    // En la demostración los botones de acceso rápido envían su propio usuario de ejemplo
+    mutationFn: (demo?: { email: string; password: string }) =>
+      sesionApi.login(demo?.email ?? email.trim(), demo?.password ?? password),
     onSuccess: (r) => {
       setPassword('');
       guardarSesion({ token: r.token, expiraEn: r.expiraEn, usuario: r.usuario });
@@ -32,7 +36,7 @@ export default function Ingresar() {
 
   const enviar = (e: FormEvent) => {
     e.preventDefault();
-    login.mutate();
+    login.mutate(undefined);
   };
 
   return (
@@ -65,6 +69,26 @@ export default function Ingresar() {
             Ingresar
           </Boton>
         </form>
+        {MODO_DEMO && (
+          <div className="mt-6 rounded-md bg-ocre-claro p-4 text-sm text-ocre-texto">
+            <p className="font-semibold">Demostración con datos de ejemplo</p>
+            <p className="mt-1">
+              Entra con un clic y compara lo que ve cada rol. Nada se envía al hotel.
+            </p>
+            <div className="mt-3 flex flex-col gap-2">
+              {USUARIOS_DEMO.map((u) => (
+                <Boton
+                  key={u.email}
+                  variante="secundario"
+                  disabled={login.isPending}
+                  onClick={() => login.mutate({ email: u.email, password: 'demo' })}
+                >
+                  Entrar como {u.rol === 'administrador' ? 'Administración' : 'Recepción'}
+                </Boton>
+              ))}
+            </div>
+          </div>
+        )}
         <a href="/" className="mt-6 inline-block text-sm text-porton underline underline-offset-4">
           Volver al sitio
         </a>

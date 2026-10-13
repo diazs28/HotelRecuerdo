@@ -246,14 +246,12 @@ export function LayoutPublico() {
               Tratamiento de datos personales
             </Link>
             {td?.responsable && <p className="text-niebla">Responsable: {td.responsable}</p>}
-            {!MODO_DEMO && (
-              <Link
-                to="/panel"
-                className="text-niebla underline-offset-4 hover:text-luz hover:underline"
-              >
-                Acceso del personal
-              </Link>
-            )}
+            <Link
+              to="/panel"
+              className="text-niebla underline-offset-4 hover:text-luz hover:underline"
+            >
+              {MODO_DEMO ? 'Panel del personal (demostración)' : 'Acceso del personal'}
+            </Link>
           </div>
         </div>
         <p

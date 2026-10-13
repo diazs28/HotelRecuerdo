@@ -6,7 +6,6 @@ import { Solicitar } from './pages/publico/Solicitar';
 import { Privacidad } from './pages/publico/Privacidad';
 import { Cargando } from './components/ui';
 import { useSesion, useTitulo } from './hooks/useSesion';
-import { MODO_DEMO } from './api/demo';
 
 // El panel se carga aparte: quien visita el sitio público no descarga el código del panel
 const LayoutPanel = lazy(() => import('./components/admin/LayoutPanel'));
@@ -77,27 +76,6 @@ function ConSesion({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-// En la demostración no hay API: el panel del personal muestra un aviso en su lugar
-function PanelNoDisponible() {
-  useTitulo('Panel del personal');
-  return (
-    <section className="mx-auto max-w-2xl px-4 py-28 sm:px-6">
-      <h1 className="text-4xl">El panel no está disponible en la demostración</h1>
-      <p className="mt-4 text-lg opacity-80">
-        Esta versión muestra solo el sitio público. El panel del personal funciona en la instalación
-        completa, con su base de datos.
-      </p>
-      <Link to="/" className="mt-6 inline-block font-semibold underline underline-offset-4">
-        Ir al inicio
-      </Link>
-    </section>
-  );
-}
-
-const rutasPanel = MODO_DEMO
-  ? [{ path: 'panel/*', element: <PanelNoDisponible />, errorElement: <ErrorRuta /> }]
-  : null;
-
 const router = createBrowserRouter([
   {
     element: <LayoutPublico />,
@@ -106,34 +84,29 @@ const router = createBrowserRouter([
       { index: true, element: <Inicio /> },
       { path: 'solicitar', element: <Solicitar /> },
       { path: 'privacidad', element: <Privacidad /> },
-      ...(rutasPanel ?? []),
       { path: '*', element: <NoEncontrado /> },
     ],
   },
-  ...(MODO_DEMO
-    ? []
-    : [
-        { path: 'panel/ingresar', element: cargar(<Ingresar />), errorElement: <ErrorRuta /> },
-        {
-          path: 'panel',
-          errorElement: <ErrorRuta />,
-          element: <ConSesion>{cargar(<LayoutPanel />)}</ConSesion>,
-          children: [
-            { index: true, element: cargar(<Tablero />) },
-            { path: 'reservas', element: cargar(<Reservas />) },
-            { path: 'reservas/nueva', element: cargar(<NuevaReserva />) },
-            { path: 'reservas/:id', element: cargar(<DetalleReserva />) },
-            { path: 'ocupacion', element: cargar(<Ocupacion />) },
-            { path: 'habitaciones', element: cargar(<Habitaciones />) },
-            { path: 'huespedes', element: cargar(<Huespedes />) },
-            { path: 'configuracion', element: cargar(<Configuracion />) },
-            { path: 'usuarios', element: cargar(<Usuarios />) },
-            { path: 'auditoria', element: cargar(<Auditoria />) },
-            { path: 'cuenta', element: cargar(<Cuenta />) },
-            { path: '*', element: <NoEncontrado /> },
-          ],
-        },
-      ]),
+  { path: 'panel/ingresar', element: cargar(<Ingresar />), errorElement: <ErrorRuta /> },
+  {
+    path: 'panel',
+    errorElement: <ErrorRuta />,
+    element: <ConSesion>{cargar(<LayoutPanel />)}</ConSesion>,
+    children: [
+      { index: true, element: cargar(<Tablero />) },
+      { path: 'reservas', element: cargar(<Reservas />) },
+      { path: 'reservas/nueva', element: cargar(<NuevaReserva />) },
+      { path: 'reservas/:id', element: cargar(<DetalleReserva />) },
+      { path: 'ocupacion', element: cargar(<Ocupacion />) },
+      { path: 'habitaciones', element: cargar(<Habitaciones />) },
+      { path: 'huespedes', element: cargar(<Huespedes />) },
+      { path: 'configuracion', element: cargar(<Configuracion />) },
+      { path: 'usuarios', element: cargar(<Usuarios />) },
+      { path: 'auditoria', element: cargar(<Auditoria />) },
+      { path: 'cuenta', element: cargar(<Cuenta />) },
+      { path: '*', element: <NoEncontrado /> },
+    ],
+  },
 ]);
 
 export function App() {
