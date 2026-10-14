@@ -30,3 +30,7 @@ export const ANIOS_DE_HISTORIA = (anioActual: number) => anioActual - MARCA.anio
 
 // Centro de Popayán (dato geográfico público de la ciudad, no la dirección del hotel)
 export const COORDENADAS_CIUDAD = { latitud: '2,4448° N', longitud: '76,6147° O' } as const;
+
+// Firma de quien desarrolló el sitio: aparece discreta en la pantalla de entrada
+// (se quita dejando el texto vacío)
+export const CREDITO_DESARROLLO = 'Experiencia digital · BWL & SOFT';

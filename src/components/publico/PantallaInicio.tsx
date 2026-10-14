@@ -1,11 +1,14 @@
-import { useRef, useState } from 'react';
-import { MARCA } from '../../config/marca';
-import { gsap, useGSAP } from '../../lib/gsap';
+import { useEffect, useRef, useState } from 'react';
+import { CREDITO_DESARROLLO, MARCA } from '../../config/marca';
 import { movimientoReducido } from '../../hooks/useMovimientoReducido';
 import { avisarFinIntro, marcarIntroEnCurso } from '../../lib/intro';
 
 const CLAVE = 'recuerdo:intro';
-const ARCOS = 7;
+// Tiempos de la animación (deben coincidir con la sección "Pantalla de entrada" de index.css)
+const INICIO_CONTADOR_MS = 250;
+const DURACION_CONTADOR_MS = 1350;
+const SALIDA_MS = 2850; // el velo empieza a difuminarse y el título de la portada sube
+const FIN_MS = 3750;
 
 function yaVista(): boolean {
   try {
@@ -30,11 +33,14 @@ const debeMostrarse = () =>
   !window.location.hash &&
   !yaVista();
 
-// Pantalla de entrada (adaptada de la de Portal Salud): el contador viaja de 1979 al año actual,
-// "El Recuerdo" emerge letra por letra y una arcada de arcos blancos sube para descubrir el sitio.
-// Una vez por pestaña; nunca con movimiento reducido ni al entrar por otra página.
+const suavizar = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+
+// Pantalla de entrada con el sello de BWL & SOFT (adaptada de la "ola difuminada" de su sitio):
+// el año viaja de 1979 al actual, "El Recuerdo" se enfoca desde un desenfoque y se disuelve, sube
+// una ola de brasa de borde suave con un brillo por delante y todo el velo sale desenfocándose
+// mientras el título de la portada emerge. Dura unos 3,7 s, una vez por pestaña; nunca con
+// movimiento reducido ni al entrar por otra página. La animación vive en index.css.
 export function PantallaInicio({ anioActual }: { anioActual: number }) {
-  const raiz = useRef<HTMLDivElement>(null);
   const contador = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(() => {
     const mostrar = debeMostrarse();
@@ -42,106 +48,68 @@ export function PantallaInicio({ anioActual }: { anioActual: number }) {
     return mostrar;
   });
 
-  useGSAP(
-    () => {
-      if (!visible || !raiz.current) return;
-      marcarVista();
-      window.scrollTo(0, 0);
-      const overflowPrevio = document.documentElement.style.overflow;
-      document.documentElement.style.overflow = 'hidden';
-      const anio = { valor: MARCA.anioOrigen };
+  useEffect(() => {
+    if (!visible) return;
+    marcarVista();
+    window.scrollTo(0, 0);
+    const overflowPrevio = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
 
-      const fin = () => {
-        document.documentElement.style.overflow = overflowPrevio;
-        avisarFinIntro();
-        setVisible(false);
-      };
+    // Contador del año
+    const inicio = performance.now() + INICIO_CONTADOR_MS;
+    let cuadro = 0;
+    const contar = (t: number) => {
+      const avance = Math.min(1, Math.max(0, (t - inicio) / DURACION_CONTADOR_MS));
+      const anio = Math.round(
+        MARCA.anioOrigen + (anioActual - MARCA.anioOrigen) * suavizar(avance),
+      );
+      if (contador.current) contador.current.textContent = String(anio);
+      if (avance < 1) cuadro = requestAnimationFrame(contar);
+    };
+    cuadro = requestAnimationFrame(contar);
 
-      gsap
-        .timeline({ onComplete: fin })
-        .from('[data-letra]', {
-          yPercent: 110,
-          duration: 0.7,
-          stagger: 0.045,
-          ease: 'expo.out',
-        })
-        .from('[data-linea]', { scaleX: 0, duration: 1.1, ease: 'expo.inOut' }, 0.1)
-        .to(
-          anio,
-          {
-            valor: anioActual,
-            duration: 1.3,
-            ease: 'power2.inOut',
-            onUpdate: () => {
-              if (contador.current) contador.current.textContent = String(Math.round(anio.valor));
-            },
-          },
-          0.15,
-        )
-        .fromTo(
-          '[data-arco]',
-          { yPercent: 100 },
-          {
-            yPercent: 0,
-            duration: 0.6,
-            stagger: { each: 0.06, from: 'center' },
-            ease: 'power3.in',
-          },
-          '+=0.25',
-        )
-        .set('[data-texto]', { autoAlpha: 0 })
-        .set(raiz.current, { backgroundColor: 'transparent' })
-        .to('[data-arco]', {
-          yPercent: -100,
-          duration: 0.75,
-          stagger: { each: 0.06, from: 'center' },
-          ease: 'power3.inOut',
-        });
-
-      // Respaldo si la pestaña pasa a segundo plano y la animación no termina
-      const respaldo = window.setTimeout(fin, 6000);
-      return () => {
-        window.clearTimeout(respaldo);
-        document.documentElement.style.overflow = overflowPrevio;
-      };
-    },
-    { scope: raiz, dependencies: [visible] },
-  );
+    const salida = window.setTimeout(() => {
+      document.documentElement.style.overflow = overflowPrevio;
+      avisarFinIntro();
+    }, SALIDA_MS);
+    const fin = window.setTimeout(() => setVisible(false), FIN_MS);
+    return () => {
+      cancelAnimationFrame(cuadro);
+      window.clearTimeout(salida);
+      window.clearTimeout(fin);
+      document.documentElement.style.overflow = overflowPrevio;
+    };
+  }, [visible, anioActual]);
 
   if (!visible) return null;
 
   return (
     <div
-      ref={raiz}
       aria-hidden="true"
-      className="fixed inset-0 z-[70] flex items-center justify-center overflow-hidden bg-noche"
+      className="entrada fixed inset-0 z-[70] grid place-items-center overflow-hidden"
     >
-      <div data-texto className="flex flex-col items-center gap-5 px-6 text-center">
-        <span ref={contador} className="font-mono text-sm tracking-[0.4em] text-brasa-2">
+      <div className="entrada__fondo absolute inset-0" />
+
+      <div className="relative z-10 flex flex-col items-center gap-5 px-6 text-center">
+        <span ref={contador} className="entrada__contador font-mono text-sm text-brasa-2">
           {MARCA.anioOrigen}
         </span>
-        <p className="flex overflow-hidden font-display text-5xl text-luz sm:text-7xl">
-          {[...'El Recuerdo'].map((l, i) => (
-            <span key={i} data-letra className="inline-block">
-              {l === ' ' ? ' ' : l}
-            </span>
-          ))}
+        <p className="entrada__nombre font-display text-[clamp(2.8rem,10vw,6.5rem)] leading-none">
+          El Recuerdo
         </p>
-        <span data-linea className="block h-px w-48 origin-left bg-brasa/70" />
-        <span className="etiqueta-hud text-niebla">
-          {MARCA.ciudad} · {MARCA.departamento}
+        <span className="entrada__linea block h-px w-44 bg-linear-to-r from-transparent via-brasa-2 to-transparent" />
+        <span className="entrada__lema etiqueta-hud text-niebla">
+          Hotel · Restaurante · Pizzería · {MARCA.ciudad}
         </span>
       </div>
 
-      <div className="pointer-events-none absolute inset-0 flex">
-        {Array.from({ length: ARCOS }).map((_, i) => (
-          <div
-            key={i}
-            data-arco
-            className="-ml-px h-full flex-1 translate-y-full rounded-t-full bg-luz"
-          />
-        ))}
-      </div>
+      {/* Ola de brasa: un brillo difuminado va por delante y la ola cubre la pantalla */}
+      <div className="entrada__brillo absolute inset-0" />
+      <div className="entrada__ola absolute inset-0" />
+
+      <p className="entrada__sello etiqueta-hud absolute inset-x-0 bottom-6 z-10 text-center text-[0.6rem] text-niebla">
+        {CREDITO_DESARROLLO}
+      </p>
     </div>
   );
 }

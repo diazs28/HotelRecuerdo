@@ -40,11 +40,13 @@ const TRAZOS = {
 
 export type NombreIcono = keyof typeof TRAZOS;
 
+// trazo: el icono se puede "dibujar" con CSS (.trazo-icono anima stroke-dashoffset de 1 a 0)
 export function Icono({
   nombre,
   className = 'size-6',
+  trazo = false,
   ...props
-}: { nombre: NombreIcono } & SVGProps<SVGSVGElement>) {
+}: { nombre: NombreIcono; trazo?: boolean } & SVGProps<SVGSVGElement>) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -57,7 +59,7 @@ export function Icono({
       className={className}
       {...props}
     >
-      <path d={TRAZOS[nombre]} />
+      <path d={TRAZOS[nombre]} {...(trazo ? { pathLength: 1, className: 'trazo-icono' } : {})} />
     </svg>
   );
 }

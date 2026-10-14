@@ -1,12 +1,11 @@
 import { useRef, useState } from 'react';
 import { LINEA_TIEMPO } from '../../../config/historia';
 import { useConsulta, useMovimientoReducido } from '../../../hooks/useMovimientoReducido';
-import { useRevelar } from '../../../hooks/useRevelar';
 import { desplazarA } from '../../../hooks/useScrollSuave';
 import { ScrollTrigger, useGSAP } from '../../../lib/gsap';
 import { cx } from '../../ui';
-import { EncabezadoSeccion } from '../EncabezadoSeccion';
 import { PalabraGigante } from '../PalabraGigante';
+import { LecturaHistoria } from './LecturaHistoria';
 import { TarjetaCapitulo } from './TarjetaCapitulo';
 
 const PROFUNDIDAD = 1100; // px entre capítulos en el corredor
@@ -174,44 +173,8 @@ function Corredor({ anios }: { anios: number }) {
   );
 }
 
-// Versión en lista (pantallas pequeñas y movimiento reducido)
-function Lista({ anios }: { anios: number }) {
-  const raiz = useRef<HTMLElement>(null);
-  useRevelar(raiz);
-  return (
-    <section
-      ref={raiz}
-      id="historia"
-      aria-labelledby="titulo-historia"
-      className="relative scroll-mt-20 px-4 py-24 sm:px-6"
-    >
-      <div className="mx-auto max-w-3xl">
-        <EncabezadoSeccion
-          numero="01"
-          etiqueta="Historia"
-          id="titulo-historia"
-          titulo={`${anios} años de memoria`}
-        >
-          Una casa familiar que empezó con un horno de pizza y creció junto a la Ciudad Blanca.
-        </EncabezadoSeccion>
-        <ol className="relative mt-14 flex flex-col gap-10 border-l border-luz/15 pl-6">
-          {LINEA_TIEMPO.map((c) => (
-            <li key={c.id} data-revelar className="revelar relative">
-              <span
-                aria-hidden
-                className="absolute -left-[31px] top-3 size-3 rounded-full bg-brasa-2 ring-4 ring-noche"
-              />
-              <TarjetaCapitulo capitulo={c} activo />
-            </li>
-          ))}
-        </ol>
-      </div>
-    </section>
-  );
-}
-
 export function LineaTiempo({ anios }: { anios: number }) {
   const reducido = useMovimientoReducido();
   const ancha = useConsulta('(min-width: 768px) and (min-height: 560px)');
-  return !reducido && ancha ? <Corredor anios={anios} /> : <Lista anios={anios} />;
+  return !reducido && ancha ? <Corredor anios={anios} /> : <LecturaHistoria anios={anios} />;
 }
